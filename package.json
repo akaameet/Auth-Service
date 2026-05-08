@@ -21,7 +21,8 @@
     "jsonwebtoken": "^9.0.3",
     "mongoose": "^9.6.1",
     "nodemailer": "^8.0.7",
-    "react-router": "^7.15.0"
+    "react-router": "^7.15.0",
+    "redis": "^5.12.1"
   },
   "devDependencies": {
     "@types/cookie-parser": "^1.4.10",
