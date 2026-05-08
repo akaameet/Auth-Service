@@ -9,6 +9,7 @@ import OtpModel from "../models/otp.model";
 import { generateOTP, generateOtpHTML } from "../utils/util";
 import { sendEmail } from "../services/email.service";
 import passwordResetModel from "../models/passwordReset.model";
+import redisClient from "../config/redis.config";
 
 dotenv.config();
 
@@ -46,12 +47,14 @@ async function registerUser(req: Request, res: Response) {
       text: `Your OTP is: ${otp}`,
       html: otpHtml,
     });
-    const optHash = crypto.createHash("sha256").update(otp).digest("hex");
+    const otpHash = crypto.createHash("sha256").update(otp).digest("hex");
+    await redisClient.set(`otp:${email}`, otpHash, {
+      EX: 300,
+    });
 
-    await OtpModel.create({
-      email: user.email,
-      user: user._id,
-      otpHash: optHash,
+    console.log("OTP SAVED:", await redisClient.get(`otp:${email}`));
+    await redisClient.set(`otp:${email}`, otpHash, {
+      EX: 300,
     });
 
     res.status(201).json({
@@ -73,11 +76,15 @@ async function verifyEmail(req: Request, res: Response) {
     const { otp, email } = req.body;
     const hash = crypto.createHash("sha256").update(otp).digest("hex");
 
-    const otpDoc = await OtpModel.findOne({
-      email,
-      otpHash: hash,
-    });
-    if (!otpDoc) {
+    const storedOtp = await redisClient.get(`otp:${email}`);
+
+    if (!storedOtp) {
+      return res.status(400).json({
+        message: "OTP expired",
+      });
+    }
+
+    if (storedOtp !== hash) {
       return res.status(400).json({
         message: "Invalid OTP",
       });
@@ -92,7 +99,7 @@ async function verifyEmail(req: Request, res: Response) {
         message: "User not found",
       });
     }
-    await OtpModel.deleteMany({ user: otpDoc.user });
+    await redisClient.del(`otp:${email}`);
 
     res.status(200).json({
       message: "Email verified successfully",
