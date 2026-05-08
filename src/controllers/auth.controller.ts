@@ -5,7 +5,6 @@ import jwt, { type JwtPayload } from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
 import sessionModel from "../models/session.model";
-import OtpModel from "../models/otp.model";
 import { generateOTP, generateOtpHTML } from "../utils/util";
 import { sendEmail } from "../services/email.service";
 import passwordResetModel from "../models/passwordReset.model";
