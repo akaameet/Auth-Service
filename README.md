@@ -66,7 +66,7 @@ src/
 
 ---
 
-## 🔐 Token & Session Architecture
+## Token & Session Architecture
 
 | Feature | Storage |
 |---|---|
@@ -227,7 +227,7 @@ http://localhost:5000
         "role": "user"
     }
 }
-> The refresh token is securely stored in an httpOnly cookie.
+> The refresh token is securely stored in an httpOnly cookie and rotated during token refresh for enhanced session security.
 ```
 
 ## Security Features
