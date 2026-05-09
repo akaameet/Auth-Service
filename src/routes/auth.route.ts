@@ -9,12 +9,18 @@ import {
   logoutAll,
   resetPassword,
 } from "../controllers/auth.controller";
+import {
+  forgotPasswordLimiter,
+  loginLimiter,
+  otpLimiter,
+  registerLimiter,
+} from "../middlewares/rateLimit.middleware";
 const router = express.Router();
 
-router.post("/register", registerUser);
-router.post("/verify-email", verifyEmail);
-router.post("/login", loginUser);
-router.post("/forgot-password", forgotPassword);
+router.post("/register", registerLimiter, registerUser);
+router.post("/verify-email", otpLimiter, verifyEmail);
+router.post("/login", loginLimiter, loginUser);
+router.post("/forgot-password", forgotPasswordLimiter, forgotPassword);
 router.post("/reset-password", resetPassword);
 router.post("/refresh-token", refreshToken);
 router.post("/logout", logoutUser);
