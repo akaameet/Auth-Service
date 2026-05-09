@@ -3,11 +3,10 @@ import userModel from "../models/user.model";
 import type { Request, Response } from "express";
 import jwt, { type JwtPayload } from "jsonwebtoken";
 import bcrypt from "bcryptjs";
-import crypto from "crypto";
+import crypto, { hash } from "crypto";
 import sessionModel from "../models/session.model";
 import { generateOTP, generateOtpHTML } from "../utils/util";
 import { sendEmail } from "../services/email.service";
-import passwordResetModel from "../models/passwordReset.model";
 import redisClient from "../config/redis.config";
 
 dotenv.config();
@@ -47,14 +46,11 @@ async function registerUser(req: Request, res: Response) {
       html: otpHtml,
     });
     const otpHash = crypto.createHash("sha256").update(otp).digest("hex");
-    await redisClient.set(`otp:${email}`, otpHash, {
-      EX: 300,
-    });
 
-    console.log("OTP SAVED:", await redisClient.get(`otp:${email}`));
     await redisClient.set(`otp:${email}`, otpHash, {
       EX: 300,
     });
+    console.log("OTP SAVED:", await redisClient.get(`otp:${email}`));
 
     res.status(201).json({
       message: "User registered. Please verify your email",
@@ -201,16 +197,11 @@ async function forgotPassword(req: Request, res: Response) {
       .update(resetToken)
       .digest("hex");
 
-    await passwordResetModel.findOneAndUpdate(
-      { user: user._id },
+    await redisClient.set(
+      `passwordReset:${hashResetToken}`,
+      user._id.toString(),
       {
-        user: user._id,
-        tokenHash: hashResetToken,
-        expiresAt: new Date(Date.now() + 5 * 60 * 1000),
-      },
-      {
-        upsert: true,
-        new: true,
+        EX: 10 * 60, // 10 min
       },
     );
 
@@ -238,31 +229,31 @@ async function resetPassword(req: Request, res: Response) {
 
     const hashedToken = crypto.createHash("sha256").update(token).digest("hex");
 
-    const resetRecord = await passwordResetModel.findOne({
-      tokenHash: hashedToken,
-      expiresAt: { $gt: Date.now() },
-    });
+    const userId = await redisClient.get(`passwordReset:${hashedToken}`);
 
-    if (!resetRecord) {
+    if (!userId) {
       return res.status(400).json({
         message: "Invalid or expired token",
       });
     }
 
-    const user = await userModel.findById(resetRecord.user);
+    const user = await userModel.findById(userId);
 
     if (!user) {
-      return res.status(400).json({
+      return res.status(404).json({
         message: "User not found",
       });
     }
 
+    // Hash new password
     const hashedPassword = await bcrypt.hash(password, 10);
 
     user.password = hashedPassword;
+
     await user.save();
 
-    await passwordResetModel.deleteOne({ _id: resetRecord._id }); //delete token
+    // Delete reset token from Redis
+    await redisClient.del(`passwordReset:${hashedToken}`);
 
     res.status(200).json({
       message: "Password reset successful",
